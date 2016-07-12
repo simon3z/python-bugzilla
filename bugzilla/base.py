@@ -34,6 +34,7 @@ else:
 from .apiversion import __version__
 from .bug import Bug, User
 from .transport import BugzillaError, _BugzillaServerProxy, _RequestsTransport
+from .transport import _BugzillaToken, _BugzillaTokenFile
 
 
 log = getLogger(__name__)
@@ -235,7 +236,7 @@ class Bugzilla(object):
         return url
 
     def __init__(self, url=-1, user=None, password=None, cookiefile=-1,
-                 sslverify=True, tokenfile=-1, use_creds=True):
+                 sslverify=True, tokenfile=-1, token=None, use_creds=True):
         """
         :param url: The bugzilla instance URL, which we will connect
             to immediately. Most users will want to specify this at
@@ -245,6 +246,7 @@ class Bugzilla(object):
             or save any cookiefile.
         :param tokenfile: If -1, use the default path. If None, don't use
             or save any tokenfile.
+        :param token: When specified the token is used for authentication.
         :param use_creds: If False, this disables cookiefile, tokenfile,
             and any bugzillarc reading. This overwrites any tokenfile
             or cookiefile settings
@@ -279,11 +281,15 @@ class Bugzilla(object):
 
         if cookiefile == -1:
             cookiefile = _default_auth_location("bugzillacookies")
+        self.cookiefile = cookiefile
+        log.debug("Using cookiefile=%s", self.cookiefile)
+
         if tokenfile == -1:
             tokenfile = _default_auth_location("bugzillatoken")
-        log.debug("Using tokenfile=%s", tokenfile)
-        self.cookiefile = cookiefile
         self.tokenfile = tokenfile
+        log.debug("Using tokenfile=%s", tokenfile)
+
+        self.token = token
 
         if url:
             self.connect(url)
@@ -496,8 +502,13 @@ class Bugzilla(object):
         self._transport = _RequestsTransport(
             url, self._cookiejar, sslverify=self._sslverify)
         self._transport.user_agent = self.user_agent
-        self._proxy = _BugzillaServerProxy(url, self.tokenfile,
-            self._transport)
+
+        if self.token is not None:
+            token = _BugzillaToken(self.token)
+        else:
+            token = _BugzillaTokenFile(url, self.tokenfile)
+
+        self._proxy = _BugzillaServerProxy(url, token, self._transport)
 
         self.url = url
         # we've changed URLs - reload config

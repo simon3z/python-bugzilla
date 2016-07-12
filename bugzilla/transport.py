@@ -28,7 +28,7 @@ class BugzillaError(Exception):
     pass
 
 
-class _BugzillaToken(object):
+class _BugzillaTokenFile(object):
     def __init__(self, uri, tokenfilename):
         self.tokenfilename = tokenfilename
         self.tokenfile = SafeConfigParser()
@@ -66,12 +66,27 @@ class _BugzillaToken(object):
         return '<Bugzilla Token :: %s>' % (self.value)
 
 
+class _BugzillaToken(object):
+    def __init__(self, token):
+        self.token = token
+
+    @property
+    def value(self):
+        return self.token
+
+    @value.setter
+    def value(self, value):
+        if self.value == value:
+            return
+        raise AttributeError("Bugzilla Token is read-only")
+
+
 class _BugzillaServerProxy(ServerProxy):
-    def __init__(self, uri, tokenfile, *args, **kwargs):
+    def __init__(self, uri, token, *args, **kwargs):
         # pylint: disable=super-init-not-called
         # No idea why pylint complains here, must be a bug
         ServerProxy.__init__(self, uri, *args, **kwargs)
-        self.token = _BugzillaToken(uri, tokenfile)
+        self.token = token
 
     def clear_token(self):
         self.token.value = None
